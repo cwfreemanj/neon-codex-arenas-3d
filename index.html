@@ -2146,11 +2146,12 @@ $('bStats').addEventListener('click',openPlayerStats);$('pStats').addEventListen
 /* ---------- main loop ---------- */
 const lk=new V3(0,1.5,0),pv=new V3();
 /* ================= CO-OP: up to 4 players · Railway relay · host simulates enemies ================= */
-const COOP_DEFAULT_URL='wss://YOUR-RAILWAY-APP.up.railway.app';
+const COOP_DEFAULT_URL='wss://neon-codex-arenas-3d-production.up.railway.app';
 const COOP={on:false,running:false,host:false,id:0,hostId:0,ws:null,code:'',players:[],pub:false,auto:0,inRoom:false,starting:false,final:false,
  px:new Map(),pe:new Map(),nid:0,aseq:0,acc:0,cardWait:0,picked:0,real:null,lastSnap:0,mode:'host',tHud:0,reqT:0};
 const _cv=new THREE.Vector3(),cNow=()=>performance.now()/1000,r2=n=>Math.round(n*100)/100;
-function coopUrl(){try{const q=new URLSearchParams(location.search).get('coop');if(q)return q;const s=localStorage.getItem('coopUrl');if(s)return s}catch(e){}return COOP_DEFAULT_URL}
+function coopNorm(u){u=(u||'').trim().replace(/\/+$/,'');if(!u)return'';if(/^https:/i.test(u))u='wss:'+u.slice(6);else if(/^http:/i.test(u))u='ws:'+u.slice(5);else if(!/^wss?:/i.test(u))u='wss://'+u;return u}
+function coopUrl(){try{const q=new URLSearchParams(location.search).get('coop');if(q)return coopNorm(q);const s=localStorage.getItem('coopUrl');if(s&&!/YOUR-RAILWAY/.test(s))return coopNorm(s)}catch(e){}return coopNorm(COOP_DEFAULT_URL)}
 const coopCount=()=>COOP.on?1+COOP.px.size:1,coopMul=()=>COOP.on&&COOP.host?1+.6*(coopCount()-1):1,coopCap=()=>COOP.on&&COOP.host?1+.4*(coopCount()-1):1;
 const coopAnyAlive=()=>!P.dead||[...COOP.px.values()].some(f=>!f.dead);
 function coopTargets(){if(!COOP.on||!COOP.host)return[P];return[COOP.real||P,...COOP.px.values()]}
@@ -2205,7 +2206,7 @@ function wireCoop(){$('modeCoop').onclick=coopOpen;$('cpClose').onclick=()=>{if(
  $('cpCh').onchange=()=>{coopSend({t:'ch',ch:$('cpCh').value})};$('cpStart').onclick=()=>coopSend({t:'start'});
  $('cpCopy').onclick=()=>{const c=COOP.code;try{navigator.clipboard.writeText(c)}catch(e){}$('cpCopy').textContent='Copied!';setTimeout(()=>$('cpCopy').textContent='Copy',1500)};
  $('cpSrv').value=(()=>{try{return localStorage.getItem('coopUrl')||''}catch(e){return''}})();
- $('cpSrvSave').onclick=()=>{try{localStorage.setItem('coopUrl',$('cpSrv').value.trim())}catch(e){}coopStatus('Server address saved.')};
+ $('cpSrvSave').onclick=()=>{try{localStorage.setItem('coopUrl',coopNorm($('cpSrv').value))}catch(e){}coopStatus('Server address saved.')};
  setInterval(()=>{if($('coopm').style.display==='flex'&&COOP.inRoom&&!COOP.running&&COOP.pub)coopRender()},500)}
 /* ---------- starting the match ---------- */
 function coopStart(m){COOP.players=m.players||COOP.players;COOP.hostId=m.host;COOP.host=m.host===COOP.id;COOP.on=true;COOP.running=true;COOP.final=false;
