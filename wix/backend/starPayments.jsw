@@ -1,0 +1,35 @@
+// Velo BACKEND file  ->  backend/starPayments.jsw
+// Prices live HERE (server side) so a player can never change what a pack costs.
+import wixPayBackend from 'wix-pay-backend';
+import wixData from 'wix-data';
+
+// Keep these ids/amounts in sync with STAR_SHOP.packs inside the game.
+export const PACKS = {
+  s100:  { stars: 100,  price: 0.99,  name: '100 Stars'  },
+  s550:  { stars: 550,  price: 4.99,  name: '550 Stars'  },
+  s1200: { stars: 1200, price: 9.99,  name: '1,200 Stars' },
+  s2600: { stars: 2600, price: 19.99, name: '2,600 Stars' },
+  s7000: { stars: 7000, price: 49.99, name: '7,000 Stars' }
+};
+
+// Called from the page code. Returns the Wix payment id the page then hands to wix-pay's startPayment().
+export async function createStarPayment(packId) {
+  const pack = PACKS[packId];
+  if (!pack) throw new Error('Unknown star pack');
+  const payment = await wixPayBackend.createPayment({
+    items: [{ name: `Neon Codex Arenas 3D - ${pack.name}`, price: pack.price }],
+    amount: pack.price,
+    currency: 'USD'
+  });
+  return { paymentId: payment.id, packId, stars: pack.stars };
+}
+
+// Optional purchase ledger. Create a Wix collection called "StarPurchases" with the text fields
+// paymentId, packId, playerId, status and the number field stars. Silently skipped if it doesn't exist.
+export async function recordPurchase(paymentId, packId, playerId, status) {
+  const pack = PACKS[packId];
+  if (!pack) return;
+  try {
+    await wixData.insert('StarPurchases', { paymentId, packId, playerId: String(playerId || ''), status, stars: pack.stars }, { suppressAuth: true });
+  } catch (e) { /* collection not created yet - ignore */ }
+}
