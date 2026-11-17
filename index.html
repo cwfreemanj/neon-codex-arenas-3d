@@ -2326,7 +2326,7 @@ function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.
  for(const[f,l,s]of flames){const k=.85+.15*Math.sin(T*13+s)*Math.sin(T*7+s*2);l.intensity=1.6*k;f.scale.set(k,1.6*k,k)}
  if(state==='load'||state==='menu'||state==='over'){menuFrame(dt);return}
  if(state==='pause'||state==='cards'){ren.setScissorTest(false);ren.render(scene,cam);return}
- if(stopT>0){stopT-=dt;dt*=.05}if(slow>0){slow-=dt;dt*=.4}
+ let tsc=1;if(stopT>0){if(stopT>.07)stopT=.07;const k=Math.min(1,stopT/.05);stopT-=dt;tsc=Math.min(tsc,1-.36*k)}if(slow>0){if(slow>.3)slow=.3;const k=Math.min(1,slow/.14);slow-=dt;tsc=Math.min(tsc,1-.55*k)}dt*=tsc;
  updFx(dt);updPS(dt);if(keys.ArrowLeft)yaw+=dt*2;if(keys.ArrowRight)yaw-=dt*2;
  pu(dt);
  if(SIEGE.active){siegeUpdate(dt);P.tick(dt);if(SIEGE.bot&&!SIEGE.bot.dead)SIEGE.bot.tick(dt);for(const u of SIEGE.units)if(!u.dead)u.tick(dt);projectiles(dt)}
