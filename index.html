@@ -2162,15 +2162,15 @@ const coopEv=(to,k,d)=>coopSend({t:'ev',to,k,d});
 const pName=id=>{const p=COOP.players.find(x=>x.id===id);return p?p.name:'Player'};
 /* ---------- connection ---------- */
 function coopStatus(msg,err){const s=$('cpStat');if(s){s.textContent=msg||'';s.className=err?'err':''}}
-function coopConnect(then){
+function coopConnect(then,forceDefault){
  if(COOP.ws&&COOP.ws.readyState===1){then&&then();return}
- const url=coopUrl();if(/YOUR-RAILWAY/.test(url)){coopStatus('Server address not set. Open “Server” below and paste your Railway address.',1);return}
+ const url=forceDefault?coopNorm(COOP_DEFAULT_URL):coopUrl();if(/YOUR-RAILWAY/.test(url)){coopStatus('Server address not set. Open “Server” below and paste your Railway address.',1);return}
  coopStatus('Connecting…');let ws;try{ws=new WebSocket(url)}catch(e){coopStatus('That server address is not valid.',1);return}
- COOP.ws=ws;let opened=false;const to=setTimeout(()=>{if(!opened){try{ws.close()}catch(e){}coopStatus('Could not reach the co-op server.',1)}},9000);
+ COOP.ws=ws;let opened=false;const fail=()=>{if(opened||COOP.ws!==ws&&!forceDefault&&false)return;if(COOP.failed===ws)return;COOP.failed=ws;try{ws.close()}catch(e){}if(!forceDefault&&url!==coopNorm(COOP_DEFAULT_URL)){coopStatus('Saved server failed, trying the default…');COOP.ws=null;coopConnect(then,true);return}COOP.ws=null;const host=url.replace(/^wss?:\/\//,'');coopStatus('Could not connect to '+host+'…',1);fetch('https://'+host+'/',{cache:'no-store'}).then(r=>r.json()).then(j=>{coopStatus('The server is online but refused this site'+(j.origins&&j.origins.length?' (its ORIGINS list is: '+j.origins.join(', ')+', and this game runs from '+location.origin+')':'')+'. On Railway, remove the ORIGINS variable or add '+location.origin+' to it, then redeploy.',1)}).catch(()=>coopStatus('Could not reach '+host+'. Check your internet connection and that the Railway service is running.',1))};const to=setTimeout(fail,9000);
  ws.onopen=()=>{opened=true;clearTimeout(to);coopStatus('');then&&then()};
  ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch(e){return}try{coopMsg(m)}catch(e){console.error(e)}};
- ws.onclose=()=>{clearTimeout(to);if(COOP.ws!==ws)return;COOP.ws=null;const was=COOP.running;COOP.inRoom=false;if(was)coopEnd('Lost connection to the co-op server.');else{coopLobbyReset();if(opened)coopStatus('Disconnected from the server.',1)}};
- ws.onerror=()=>{if(!opened)coopStatus('Could not reach the co-op server.',1)}}
+ ws.onclose=()=>{if(!opened){clearTimeout(to);fail();return}clearTimeout(to);if(COOP.ws!==ws)return;COOP.ws=null;const was=COOP.running;COOP.inRoom=false;if(was)coopEnd('Lost connection to the co-op server.');else{coopLobbyReset();if(opened)coopStatus('Disconnected from the server.',1)}};
+ ws.onerror=()=>{if(!opened){clearTimeout(to);fail()}}}
 function coopMsg(m){switch(m.t){
  case'welcome':COOP.id=m.id;break;
  case'room':COOP.inRoom=true;COOP.code=m.code;COOP.hostId=m.host;COOP.host=m.host===COOP.id;COOP.players=m.players||[];COOP.pub=!!m.pub;COOP.auto=m.auto||0;if(COOP.running)coopSyncRoster();else coopRender();break;
@@ -2307,14 +2307,19 @@ wireCoop();
 /* ===== Universal ground lock: keeps every character/enemy's lowest foot on the floor in every animation ===== */
 const _gv=new THREE.Vector3();
 function groundFix(f,dt){
- if(f.dead||f.rg||f.air||f.p.y>.04||!f.root)return;
+ if(!f.root)return;
  if(!f._gb){f._gb=['LeftFoot','RightFoot'].map(n=>f.root.getObjectByName('mixamorig_'+n)||f.root.getObjectByName(n)).filter(Boolean);f._gy0=f.root.position.y;f._ga=0}
  if(!f._gb.length)return;
+ const apply=()=>{f.root.position.y=f._gy0+f._ga};
+ if(f.dead||f.rg)return;
+ if(f.air||f.p.y>.04){f._ga*=1-Math.min(1,dt*6);apply();return}          /* airborne: let the offset relax to zero, never accumulate */
  f.g.updateMatrixWorld(true);let m=1e9;for(const b of f._gb){b.getWorldPosition(_gv);if(_gv.y<m)m=_gv.y}
- const c=m-f.p.y,want=.105*(f.sz||1),err=c-want;
- if(err>.9||err<-.4)return;                      /* deliberate leap / flip: leave it alone */
- f._ga=Math.max(-.7,Math.min(.7,f._ga-err*Math.min(1,dt*9)));
- f.root.position.y=f._gy0+f._ga}
+ const c=m-f.p.y,c0=c-f._ga,want=.105*(f.sz||1);                       /* c0 = foot height with NO correction applied */
+ let target=want-c0;
+ if(c0-want>.9)target=0;                                                /* deliberate leap/flip pose: don't pull it down */
+ target=Math.max(-.7,Math.min(.7,target));
+ const rate=c<-.02?30:9;                                                /* feet under the floor: snap back quickly */
+ f._ga+=(target-f._ga)*Math.min(1,dt*rate);apply()}
 const _gtick=F.prototype.tick;F.prototype.tick=function(dt){const r=_gtick.call(this,dt);if(!this.isBot||!this.team)try{groundFix(this,dt)}catch(e){}return r};
 
 function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.05);T+=dt;comboTick(dt);slamT-=dt;
